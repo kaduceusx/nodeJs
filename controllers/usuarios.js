@@ -72,13 +72,15 @@ const usuariosDelete = async(req,res=response) => {
 
    const {id} = req.params;
 
+   //const uid = req.uid;
+
    //fisicamente
-   const usuario = await Usuario.findByIdAndDelete(id);
+   //const usuario = await Usuario.findByIdAndDelete(id);
 
    //cambiar el estado activado del usuario
-   // const usuario = await Usuario.findByIdAndUpdate(id, {estado:false});
+   const usuario = await Usuario.findByIdAndUpdate(id, {estado:false});
 
-   res.json(usuario);
+   return res.json(usuario);
 }
 
 module.exports = {
