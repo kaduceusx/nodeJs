@@ -1,55 +1,166 @@
-
-const path = require('path');
-const {v4: uuidv4} = require('uuid');
-
+const path = require("path");
+const fs = require("fs");
 const { response } = require("express");
+const { subirArchivo } = require("../helpers");
 
+const {Usuario, Producto} = require("../models");
 
-const cargarArchivo = (req, res=response)=>{
+const cargarArchivo = async (req, res=response)=>{
 
    //console.log(req.files);
-
-   if(!req.files || Object.keys(req.files).length === 0 || !req.files.archivo){
-      res.status(400).json({
-         msg: 'No hay archivos en la peticion'
-      });
-      return ;
-   }
-
-   const {archivo} = req.files;
-   const nombreCortado = archivo.name.split('.');
-   const extension = nombreCortado[nombreCortado.length - 1];
-
-   /* -------------------------- validar la extension -------------------------- */
-   const extensionesPermitidas = ['jpg', 'png', 'gif'];
-
-   if(!extensionesPermitidas.includes(extension)){
-      return res.status(400).json({
-         msg: `La extension ${extension} no es permitida, Las permitidas son: ${extensionesPermitidas}`
-      })
-   }
-
-   // res.json({
-   //    extension
-   // })
    
-   const nombreTemp = uuidv4() + '.' + extension;
-   const uploadPath = path.join(__dirname, '../uploads/', nombreTemp);
-
-   archivo.mv(uploadPath, (err)=>{
-      if(err){
-         return res.status(500).json({
-            err   
-         });
-      }
-
+   try {
+      // const pathComplemto = await subirArchivo(req.files, ['txt','md'], 'textos');
+      const pathComplemto = await subirArchivo(req.files, undefined, 'imgs'); //al ser undefined manda el argumento por defecto
+   
       res.json({
-         msg: 'El archivo se subio al path: ' + uploadPath
+         NombreDelArchivo: pathComplemto
       })
-   });
+   } catch (error) {
+      res.status(400).json({
+         msg: error
+      });
+   }
+
+   //Imagenes
+
+   
 
 }
 
+
+const actualizarArchivo = async (req, res=response)=>{
+
+   try {
+      const {id, coleccion} = req.params;
+
+      let modelo;
+
+      switch (coleccion) {
+         case 'usuarios':
+            modelo = await Usuario.findById(id);
+            if(!modelo){
+               return res.status(400).json({
+                  msg: `No existe un usuario con el id ${id}`
+               })
+            }
+            break;
+
+         case 'productos':
+            modelo = await Producto.findById(id);
+            if(!modelo){
+               return res.status(400).json({
+                  msg: `No existe un producto con el id ${id}`
+               })
+            }
+            break;
+      
+         default:
+            return res.status(500).json({
+               msg: 'Se me olvido validar esto'
+            });
+      }
+
+
+      //Limpiar imagenes previas
+      if(modelo.img){
+
+        
+         //hay que borrar la img del servidor
+         const pathImagen = path.join(__dirname, '../uploads', coleccion, modelo.img);
+
+        
+         if(fs.existsSync(pathImagen)){
+            fs.unlinkSync(pathImagen);
+         }
+
+
+      }
+
+      const nombreArchivo = await subirArchivo(req.files, undefined, coleccion);
+      modelo.img = nombreArchivo;
+      
+      await modelo.save();
+
+      res.json({
+         modelo
+      });
+
+   } catch (error) {
+      res.json({
+         msg: "el error es : " + error
+      })
+   }
+
+   
+
+}
+
+
+const mostrarImagen = async(req, res=response) => {
+
+   try {
+      const {id, coleccion} = req.params;
+
+      let modelo;
+
+      switch (coleccion) {
+         case 'usuarios':
+            modelo = await Usuario.findById(id);
+            if(!modelo){
+               return res.status(400).json({
+                  msg: `No existe un usuario con el id ${id}`
+               })
+            }
+            break;
+
+         case 'productos':
+            modelo = await Producto.findById(id);
+            if(!modelo){
+               return res.status(400).json({
+                  msg: `No existe un producto con el id ${id}`
+               })
+            }
+            break;
+      
+         default:
+            return res.status(500).json({
+               msg: 'Se me olvido validar esto'
+            });
+      }
+
+
+      //Limpiar imagenes previas
+      if(modelo.img){
+
+         //hay que borrar la img del servidor
+         const pathImagen = path.join(__dirname, '../uploads', coleccion, modelo.img);
+
+         if(fs.existsSync(pathImagen)){
+            return res.sendFile(pathImagen);
+         }
+      }
+
+      const pathImagenDefecto = path.join(__dirname, '../assets/imgs', coleccion, 'no-image.jpg');
+
+      // return res.json({
+      //    msg: pathImagenDefecto
+      // })
+      return res.sendFile(pathImagenDefecto);
+
+      res.json({
+         msg: 'Falta placeholder'
+      })
+
+   } catch (error) {
+      res.json({
+         msg: "el error es : " + error
+      })
+   }
+}
+
 module.exports = {
-   cargarArchivo
+   cargarArchivo,
+   actualizarArchivo,
+   mostrarImagen
 }
